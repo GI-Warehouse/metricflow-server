@@ -1,0 +1,55 @@
+name: Deploy to Cloud Run (prod)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: data-warehouse-292607
+  REGION: europe-north1
+  SERVICE: gi-data-cf-metricflow
+  REPOSITORY: metricflow-server
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/958689874741/locations/global/workloadIdentityPools/github-actions-pool-prod/providers/github-provider"
+          service_account: "sa-github-deployer@data-warehouse-292607.iam.gserviceaccount.com"
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # MCP_ENABLED is a build argument, not a runtime env var — the Dockerfile gates
+      # `pip install ".[bigquery,mcp]"` on it. Setting it at deploy time does nothing and
+      # /mcp silently never mounts, which is why upstream's GHCR images can't be used.
+      - name: Build and push image
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}"
+          docker build --build-arg ADAPTER=bigquery --build-arg MCP_ENABLED=true -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
+      # min/max instances are both 1 deliberately: the semantic manifest lives only in the
+      # container's memory (see engine_manager.py), so a cold start or a second instance
+      # serves an empty engine until /admin/refresh is POSTed again.
+      - name: Deploy to Cloud Run
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE }}:${{ github.sha }}"
+          gcloud run deploy ${{ env.SERVICE }} --image="$IMAGE" --region=${{ env.REGION }} --project=${{ env.PROJECT_ID }} --service-account=sa-metricflow@${{ env.PROJECT_ID }}.iam.gserviceaccount.com --set-secrets=MF_API_KEY=gi-metricflow-api-key:latest,MF_ADMIN_KEY=gi-metricflow-admin-key:latest,MF_PROFILES_B64=gi-metricflow-profiles-b64:latest --memory=1Gi --cpu=1 --min-instances=1 --max-instances=1 --allow-unauthenticated
+
+      - name: Show service URL
+        run: gcloud run services describe ${{ env.SERVICE }} --region=${{ env.REGION }} --project=${{ env.PROJECT_ID }} --format="value(status.url)"
