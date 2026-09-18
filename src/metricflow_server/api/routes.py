@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from dbt_semantic_interfaces.type_enums import DimensionType
+from metricflow_semantic_interfaces.type_enums import DimensionType
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from metricflow.engine.metricflow_engine import MetricFlowQueryRequest
 from metricflow_semantics.errors.error_classes import (
