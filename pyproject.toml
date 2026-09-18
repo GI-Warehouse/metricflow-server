@@ -12,8 +12,8 @@ dependencies = [
     "fastapi>=0.104",
     "uvicorn[standard]>=0.24",
     "pydantic-settings>=2.0",
-    "metricflow>=0.207.3,<0.209.0",
-    "dbt-metricflow>=0.8.2,<0.9.0",
+    "metricflow>=0.213.0,<0.214.0",
+    "dbt-metricflow>=0.15.0,<0.16.0",
 ]
 
 [project.optional-dependencies]

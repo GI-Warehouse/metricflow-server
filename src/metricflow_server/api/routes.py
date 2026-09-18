@@ -74,7 +74,7 @@ def health(response: Response):
 def query(body: QueryRequest):
     engine = _require_engine()
 
-    mf_request = MetricFlowQueryRequest.create_with_random_request_id(
+    mf_request = MetricFlowQueryRequest.create(
         metric_names=body.metrics,
         group_by_names=body.group_by,
         where_constraints=body.where,
