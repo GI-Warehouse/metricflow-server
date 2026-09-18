@@ -48,7 +48,7 @@ def _serialize_dimension(d) -> DimensionResponse:
 
     return DimensionResponse(
         name=d.name,
-        qualified_name=d.qualified_name,
+        qualified_name=d.dunder_name,
         description=d.description,
         type=str(d.type),
         label=d.label,
